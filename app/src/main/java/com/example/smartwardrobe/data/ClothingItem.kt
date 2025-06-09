@@ -13,5 +13,5 @@ data class ClothingItem(
     val style: String,
     val thickness: String,
     val category: String,
-    val imageUri: String
+    val imageUri: String?= null
 )

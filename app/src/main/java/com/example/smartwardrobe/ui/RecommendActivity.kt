@@ -35,6 +35,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
+import com.example.smartwardrobe.data.ClothingItem
 
 // ... Zhipu AI的数据类和接口定义保持不变 ...
 data class ZhipuRequest(
@@ -177,19 +178,18 @@ class RecommendActivity : AppCompatActivity() {
         // --- 开始构造“超级提示词” ---
 
         // === 步骤 1: 创建模拟的衣橱数据 (Mock Data) ===
-        // 等你朋友的数据库完成后，这里会换成真正的数据库查询结果
-        val mockWardrobe = listOf(
-            ClothingItem("T恤", "白色", "休闲"),
-            ClothingItem("T恤", "黑色", "休闲"),
-            ClothingItem("Polo衫", "蓝色", "商务休闲"),
-            ClothingItem("牛仔裤", "蓝色", "休闲"),
-            ClothingItem("休闲裤", "卡其色", "休闲"),
-            ClothingItem("西裤", "深灰色", "商务"),
-            ClothingItem("西装外套", "黑色", "商务"),
-            ClothingItem("运动鞋", "白色", "休闲"),
-            ClothingItem("皮鞋", "黑色", "商务")
-        )
 
+        val mockWardrobe = listOf(
+            ClothingItem(name = "基础款白T恤", category = "T恤", thickness = "薄", style = "休闲"),
+            ClothingItem(name = "纯黑圆领T恤", category = "T恤", thickness = "薄", style = "休闲"),
+            ClothingItem(name = "经典蓝色Polo衫", category = "Polo衫", thickness = "薄" , style = "商务休闲"),
+            ClothingItem(name = "修身牛仔裤", category = "牛仔裤",  thickness = "中",style = "休闲"),
+            ClothingItem(name = "卡其色休闲裤", category = "休闲裤", thickness = "厚", style = "休闲"),
+            ClothingItem(name = "深灰色西裤", category = "西裤",  thickness = "厚", style = "商务"),
+            ClothingItem(name = "黑色西装外套", category = "西装外套", thickness = "厚", style = "商务"),
+            ClothingItem(name = "小白鞋", category = "运动鞋", thickness = "中", style = "休闲"),
+            ClothingItem(name = "黑色商务皮鞋", category = "皮鞋", thickness = "厚", style = "商务")
+        )
         // === 步骤 2: 获取其他信息 (天气和用户输入) ===
         // 我们直接从UI上已经显示的天气信息TextView里获取文本
         val weatherInfo = tvWeather.text.toString()
