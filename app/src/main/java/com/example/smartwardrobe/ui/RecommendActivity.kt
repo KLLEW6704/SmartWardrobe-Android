@@ -160,9 +160,11 @@ class RecommendActivity : AppCompatActivity() {
     }
 
 
+    // [用这个新版本完整替换旧的函数]
     private fun fetchZhipuRecommendation(userInput: String) {
+        // --- API Key和Token的生成逻辑保持不变 ---
         val apiKey = BuildConfig.ZHIPU_API_KEY
-        if (apiKey.isEmpty()) {
+        if (apiKey.isEmpty() || apiKey == "YOUR_ZHIPU_API_KEY") {
             Toast.makeText(this, "API Key未在local.properties中配置", Toast.LENGTH_LONG).show()
             return
         }
@@ -172,9 +174,57 @@ class RecommendActivity : AppCompatActivity() {
             return
         }
 
+        // --- 开始构造“超级提示词” ---
+
+        // === 步骤 1: 创建模拟的衣橱数据 (Mock Data) ===
+        // 等你朋友的数据库完成后，这里会换成真正的数据库查询结果
+        val mockWardrobe = listOf(
+            ClothingItem("T恤", "白色", "休闲"),
+            ClothingItem("T恤", "黑色", "休闲"),
+            ClothingItem("Polo衫", "蓝色", "商务休闲"),
+            ClothingItem("牛仔裤", "蓝色", "休闲"),
+            ClothingItem("休闲裤", "卡其色", "休闲"),
+            ClothingItem("西裤", "深灰色", "商务"),
+            ClothingItem("西装外套", "黑色", "商务"),
+            ClothingItem("运动鞋", "白色", "休闲"),
+            ClothingItem("皮鞋", "黑色", "商务")
+        )
+
+        // === 步骤 2: 获取其他信息 (天气和用户输入) ===
+        // 我们直接从UI上已经显示的天气信息TextView里获取文本
+        val weatherInfo = tvWeather.text.toString()
+
+        // === 步骤 3: 构造最终的“超级提示词” (Prompt Engineering) ===
+        // 使用Gson库将我们的衣物列表转换成AI更容易理解的JSON字符串格式
+        val wardrobeJson = Gson().toJson(mockWardrobe)
+
+        val prompt = """
+    你是一位专业的穿搭顾问。请根据以下全部信息，为我推荐一套最合适的穿搭方案。
+
+    ---
+    **我的需求或场景：**
+    $userInput
+
+    ---
+    **当前天气情况：**
+    $weatherInfo
+
+    ---
+    **我的衣橱里所有可用的衣物清单（请严格遵守并只从以下清单中选择衣物进行搭配）：**
+    $wardrobeJson
+    ---
+
+    请直接以“上装: [衣物], 下装: [衣物], 外套(可选): [衣物], 鞋子: [衣物]”的格式给出你的推荐，不要说其他无关的话。
+    """.trimIndent()
+
+        // [调试日志] 打印出我们最终构造的完整提示词，这非常有用！
+        Log.d("SuperPrompt", "构造出的提示词是:\n$prompt")
+
+        // === 步骤 4: 调用API (这部分逻辑和之前几乎一样) ===
         progressBar.visibility = View.VISIBLE
-        tvRecommendations.text = "智谱AI正在思考中..."
-        val messages = listOf(ZhipuMessage(content = "请帮我提供一套适合以下场景的穿搭建议：${userInput}。请直接给出具体的衣物搭配，不要说其他无关的话。"))
+        tvRecommendations.text = "AI正在根据你的衣橱和天气进行搭配..."
+
+        val messages = listOf(ZhipuMessage(content = prompt))
         val request = ZhipuRequest(messages = messages)
         val call = zhipuApiService.getCompletion("Bearer $token", request)
 
@@ -184,7 +234,7 @@ class RecommendActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     val result = response.body()?.choices?.firstOrNull()?.message?.content
                     tvRecommendations.text = result ?: "AI没有返回有效的建议。"
-                    Toast.makeText(this@RecommendActivity, "智谱AI建议获取成功！", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@RecommendActivity, "智能衣橱建议获取成功！", Toast.LENGTH_SHORT).show()
                 } else {
                     val errorBody = response.errorBody()?.string()
                     tvRecommendations.text = "请求失败，错误码：${response.code()}\n${errorBody}"
@@ -199,7 +249,6 @@ class RecommendActivity : AppCompatActivity() {
             }
         })
     }
-
     // ... loadInitialClothing() 和 requestLocationAndLoadWeather() 保持不变 ...
     private fun loadInitialClothing() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
