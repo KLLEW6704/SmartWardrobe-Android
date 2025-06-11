@@ -6,12 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageView // 导入 ImageView
-import android.widget.ProgressBar
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -21,22 +16,19 @@ import com.example.smartwardrobe.BuildConfig
 import com.example.smartwardrobe.R
 import com.example.smartwardrobe.data.*
 import com.example.smartwardrobe.logic.OutfitRecommender
+import com.example.smartwardrobe.logic.ZhipuPromptHelper
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
-import retrofit2.Retrofit
+import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
-import java.util.Locale // 导入 Locale
+import java.util.Locale
 
-// Zhipu AI的数据类和接口定义保持不变...
+// Zhipu AI的数据类和接口定义
 data class ZhipuRequest(
     val model: String = "glm-4",
     val messages: List<ZhipuMessage>
@@ -53,7 +45,6 @@ data class ZhipuChoice(
     val message: ZhipuMessage
 )
 data class ZhipuUsage(
-    @SerializedName("total_tokens")
     val totalTokens: Int
 )
 interface ZhipuApiService {
@@ -63,7 +54,6 @@ interface ZhipuApiService {
         @Body request: ZhipuRequest
     ): Call<ZhipuResponse>
 }
-
 
 class RecommendActivity : AppCompatActivity() {
 
@@ -80,23 +70,19 @@ class RecommendActivity : AppCompatActivity() {
     private lateinit var zhipuApiService: ZhipuApiService
     private lateinit var weatherService: WeatherService
 
-    // --- [修改] 声明新的天气卡片UI组件 ---
     private lateinit var ivWeatherBackground: ImageView
     private lateinit var ivWeatherIcon: ImageView
     private lateinit var tvLocation: TextView
     private lateinit var tvTemperature: TextView
     private lateinit var tvWeatherCondition: TextView
 
-    // --- 其他UI组件声明 ---
     private lateinit var etHuggingFaceInput: EditText
     private lateinit var btnSubmitToHuggingFace: Button
     private lateinit var tvRecommendations: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var btnRetry: Button
 
-    // 用于存储当前天气信息的变量
     private var currentWeatherData: WeatherResponse? = null
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,16 +108,12 @@ class RecommendActivity : AppCompatActivity() {
         }
     }
 
-    // --- [修改] 初始化所有新的UI视图 ---
     private fun initViews() {
-        // 天气卡片视图
         ivWeatherBackground = findViewById(R.id.iv_weather_background)
         ivWeatherIcon = findViewById(R.id.iv_weather_icon)
         tvLocation = findViewById(R.id.tv_location)
         tvTemperature = findViewById(R.id.tv_temperature)
         tvWeatherCondition = findViewById(R.id.tv_weather_condition)
-
-        // 其他视图
         etHuggingFaceInput = findViewById(R.id.etHuggingFaceInput)
         btnSubmitToHuggingFace = findViewById(R.id.btnSubmitToHuggingFace)
         tvRecommendations = findViewById(R.id.tvRecommendations)
@@ -139,20 +121,19 @@ class RecommendActivity : AppCompatActivity() {
         btnRetry = findViewById(R.id.btnRetry)
     }
 
-    // initServices() 和 generateZhipuToken() 保持不变...
     private fun initServices() {
         weatherService = Retrofit.Builder()
             .baseUrl(weatherApiBaseUrl)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(WeatherService::class.java)
-
         val zhipuRetrofit = Retrofit.Builder()
             .baseUrl("https://open.bigmodel.cn/api/paas/v4/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         zhipuApiService = zhipuRetrofit.create(ZhipuApiService::class.java)
     }
+
     private fun generateZhipuToken(apiKey: String): String? {
         try {
             val parts = apiKey.trim().split(".")
@@ -175,8 +156,6 @@ class RecommendActivity : AppCompatActivity() {
         }
     }
 
-
-    // [修改] fetchZhipuRecommendation 函数，使其使用已经保存的天气数据
     private fun fetchZhipuRecommendation(userInput: String) {
         val apiKey = BuildConfig.ZHIPU_API_KEY
         if (apiKey.isEmpty() || apiKey == "YOUR_ZHIPU_API_KEY") {
@@ -188,50 +167,32 @@ class RecommendActivity : AppCompatActivity() {
             Toast.makeText(this, "API Key格式错误，无法生成Token", Toast.LENGTH_LONG).show()
             return
         }
-
-        // 检查是否有天气数据
         if (currentWeatherData == null) {
             Toast.makeText(this, "正在等待天气信息...", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val mockWardrobe = listOf(
-            ClothingItem(name = "基础款白T恤", category = "T恤", thickness = "薄", style = "休闲"),
-            ClothingItem(name = "纯黑圆领T恤", category = "T恤", thickness = "薄", style = "休闲"),
-            ClothingItem(name = "经典蓝色Polo衫", category = "Polo衫", thickness = "薄" , style = "商务休闲"),
-            ClothingItem(name = "修身牛仔裤", category = "牛仔裤",  thickness = "中",style = "休闲"),
-            ClothingItem(name = "卡其色休闲裤", category = "休闲裤", thickness = "厚", style = "休闲"),
-            ClothingItem(name = "深灰色西裤", category = "西裤",  thickness = "厚", style = "商务"),
-            ClothingItem(name = "黑色西装外套", category = "西装外套", thickness = "厚", style = "商务"),
-            ClothingItem(name = "小白鞋", category = "运动鞋", thickness = "中", style = "休闲"),
-            ClothingItem(name = "黑色商务皮鞋", category = "皮鞋", thickness = "厚", style = "商务")
+        // 获取用户衣柜和用户信息
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val itemsJson = prefs.getString(KEY_ITEMS, null)
+        val userItems: List<ClothingItem> = if (itemsJson.isNullOrEmpty()) emptyList() else {
+            val type = object : TypeToken<List<ClothingItem>>() {}.type
+            Gson().fromJson(itemsJson, type)
+        }
+        val wardrobeJson = Gson().toJson(userItems)
+        val userInfo = UserPreferences(this).getUserInfo()
+        val occasion = userInput
+
+        // 拼接优化后的prompt
+        val prompt = ZhipuPromptHelper.buildZhipuOutfitPrompt(
+            gender = userInfo.gender,
+            bodyType = userInfo.comfort,
+            city = currentWeatherData!!.name,
+            weatherDesc = currentWeatherData!!.weather.firstOrNull()?.main ?: "未知",
+            temperature = currentWeatherData!!.main.temp.toString(),
+            occasion = occasion,
+            wardrobeJson = wardrobeJson
         )
-
-        // 从天气卡片UI获取天气信息文本
-        val weatherInfo = "地点: ${tvLocation.text}, 天气: ${tvWeatherCondition.text}, 温度: ${tvTemperature.text}"
-
-        val wardrobeJson = Gson().toJson(mockWardrobe)
-
-        val prompt = """
-    你是一位专业的穿搭顾问。请根据以下全部信息，为我推荐一套最合适的穿搭方案。
-
-    ---
-    **我的需求或场景：**
-    $userInput
-
-    ---
-    **当前天气情况：**
-    $weatherInfo
-
-    ---
-    **我的衣橱里所有可用的衣物清单（请严格遵守并只从以下清单中选择衣物进行搭配）：**
-    $wardrobeJson
-    ---
-
-    请直接以“上装: [衣物], 下装: [衣物], 外套(可选): [衣物], 鞋子: [衣物]”的格式给出你的推荐，不要说其他无关的话。
-    """.trimIndent()
-
-        Log.d("SuperPrompt", "构造出的提示词是:\n$prompt")
 
         progressBar.visibility = View.VISIBLE
         tvRecommendations.text = "AI正在根据你的衣橱和天气进行搭配..."
@@ -253,7 +214,6 @@ class RecommendActivity : AppCompatActivity() {
                     Log.e("ZhipuAPI", "Error: ${response.code()} - $errorBody")
                 }
             }
-
             override fun onFailure(call: Call<ZhipuResponse>, t: Throwable) {
                 progressBar.visibility = View.GONE
                 tvRecommendations.text = "网络请求失败，请检查网络连接。\n错误: ${t.message}"
@@ -262,7 +222,6 @@ class RecommendActivity : AppCompatActivity() {
         })
     }
 
-    // loadInitialClothing(), requestLocationAndLoadWeather(), onRequestPermissionsResult() 保持不变...
     private fun loadInitialClothing() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (!prefs.contains(KEY_ITEMS)) {
@@ -290,8 +249,6 @@ class RecommendActivity : AppCompatActivity() {
             }
         }
     }
-
-    // fetchLocationAndLoadWeather(), fetchWeatherByCoordinates(), fetchWeatherByCity() 保持不变...
     private fun fetchLocationAndLoadWeather() {
         progressBar.visibility = View.VISIBLE
         btnRetry.visibility = View.GONE
@@ -354,26 +311,21 @@ class RecommendActivity : AppCompatActivity() {
         })
     }
 
-
-    // --- [新增] 更新天气卡片UI的专用方法 ---
     private fun updateWeatherUI(weather: WeatherResponse?) {
         if (weather == null) {
-            // 可以设置一个默认的或者错误的UI状态
             tvLocation.text = "未知地点"
             tvTemperature.text = "--°"
             tvWeatherCondition.text = "天气获取失败"
-            ivWeatherBackground.setImageResource(R.drawable.bg_default) // 确保你有一个名为 bg_default 的默认背景图
-            ivWeatherIcon.setImageResource(R.drawable.ic_default)       // 确保你有一个名为 ic_default 的默认图标
+            ivWeatherBackground.setImageResource(R.drawable.bg_default)
+            ivWeatherIcon.setImageResource(R.drawable.ic_default)
             return
         }
 
         tvLocation.text = weather.name
         tvTemperature.text = String.format(Locale.getDefault(), "%.0f°", weather.main.temp)
-
         val condition = weather.weather.firstOrNull()?.main ?: "Unknown"
         tvWeatherCondition.text = condition
 
-        // 根据天气状况设置背景和图标
         when (condition.toLowerCase(Locale.ROOT)) {
             "clear" -> {
                 ivWeatherBackground.setImageResource(R.drawable.bg_sunny)
@@ -388,7 +340,7 @@ class RecommendActivity : AppCompatActivity() {
                 ivWeatherIcon.setImageResource(R.drawable.ic_rainy)
             }
             "snow" -> {
-                ivWeatherBackground.setImageResource(R.drawable.bg_snow) // 你需要准备 bg_snow 和 ic_snow
+                ivWeatherBackground.setImageResource(R.drawable.bg_snow)
                 ivWeatherIcon.setImageResource(R.drawable.ic_snow)
             }
             else -> {
