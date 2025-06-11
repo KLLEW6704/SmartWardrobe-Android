@@ -15,7 +15,7 @@ class InitialUserSetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val prefs = UserPreferences(this)
         if (prefs.isUserSet()) {
-            startActivity(Intent(this, OccasionSelectionActivity::class.java))
+            startActivity(Intent(this, RecommendActivity::class.java))
             finish()
             return
         }
@@ -33,7 +33,7 @@ class InitialUserSetupActivity : AppCompatActivity() {
                 rgComfort.checkedRadioButtonId
             ).text.toString()
             prefs.saveUserInfo(UserInfo(gender, comfort))
-            startActivity(Intent(this, OccasionSelectionActivity::class.java))
+            startActivity(Intent(this, RecommendActivity::class.java))
             finish()
         }
     }
