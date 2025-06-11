@@ -326,7 +326,7 @@ class RecommendActivity : AppCompatActivity() {
         val condition = weather.weather.firstOrNull()?.main ?: "Unknown"
         tvWeatherCondition.text = condition
 
-        when (condition.toLowerCase(Locale.ROOT)) {
+        when (condition.lowercase(Locale.ROOT)) {
             "clear" -> {
                 ivWeatherBackground.setImageResource(R.drawable.bg_sunny)
                 ivWeatherIcon.setImageResource(R.drawable.ic_sunny)
