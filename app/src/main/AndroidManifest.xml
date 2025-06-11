@@ -22,7 +22,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".ui.OccasionSelectionActivity" />
         <activity android:name=".ui.RecommendActivity" />
         <activity android:name=".ui.AddClothingActivity" />
 

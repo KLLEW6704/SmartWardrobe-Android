@@ -356,39 +356,14 @@ class RecommendActivity : AppCompatActivity() {
         // 步骤1：更新天气UI（无论是否成功）
         updateWeatherUI(weather)
 
-        // 步骤2：如果天气数据获取失败，则不进行后续的衣物推荐
+        // 步骤2：如果天气数据获取失败，则提示用户
         if (weather == null) {
             tvRecommendations.text = "无法获取天气，暂时不能提供穿搭建议。"
             return
         }
 
-        // 步骤3：继续进行原有的衣物推荐逻辑
-        val occasion = intent.getStringExtra("occasion") ?: ""
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val json = prefs.getString(KEY_ITEMS, null)
-        val userItems: List<ClothingItem> = if (json.isNullOrEmpty()) emptyList() else {
-            val type = object : TypeToken<List<ClothingItem>>() {}.type
-            Gson().fromJson(json, type)
-        }
-        if (userItems.isEmpty()) {
-            tvRecommendations.text = "你的衣橱是空的，请先添加衣物。"
-            return
-        }
-
-        val recommendedOutfits = OutfitRecommender.recommend(weather, UserPreferences(this).getUserInfo(), userItems, occasion)
-        val sb = StringBuilder()
-        recommendedOutfits.forEachIndexed { index, outfit ->
-            sb.append("—— 推荐套装 ${index + 1}（得分 ${"%.1f".format(outfit.score)}）——\n")
-            sb.append("上装: ${outfit.top?.name ?: "无"}\n")
-            sb.append("下装: ${outfit.bottom?.name ?: "无"}\n")
-            sb.append("外套: ${outfit.outer?.name ?: "无"}\n")
-            sb.append("鞋子: ${outfit.shoes?.name ?: "无"}\n\n")
-        }
-
-        // 如果tvRecommendations是默认文本，才更新它
-        if (tvRecommendations.text.contains("将会显示在这里") || tvRecommendations.text.isEmpty()) {
-            tvRecommendations.text = if (sb.isNotEmpty()) sb.toString() else "没有找到合适的搭配"
-        }
+        // 步骤3：显示提示信息，引导用户使用AI推荐
+        tvRecommendations.text = "请输入你的场景或需求，获取智能穿搭建议"
     }
 
     // loadDefaultClothingFromAssets() 和 saveUserItemsToLocal() 保持不变...
