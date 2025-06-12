@@ -42,6 +42,7 @@ import androidx.lifecycle.lifecycleScope
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.example.smartwardrobe.BuildConfig
+import com.example.smartwardrobe.data.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.withTimeoutOrNull
@@ -97,6 +98,9 @@ class WardrobeActivity : AppCompatActivity() {
 
         recyclerView = findViewById(R.id.recyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
+
+        adapter = WardrobeAdapter(clothingItems, this)
+        recyclerView.adapter = adapter
 
         // 设置拍照按钮点击事件
         findViewById<FloatingActionButton>(R.id.fabCamera).setOnClickListener {
@@ -754,8 +758,8 @@ class WardrobeActivity : AppCompatActivity() {
     }
 
     private fun saveItems() {
-        val prefs = getSharedPreferences("clothing_prefs", MODE_PRIVATE)
-        prefs.edit().putString("clothing_items", Gson().toJson(clothingItems)).apply()
+        val prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE)
+        prefs.edit().putString(Constants.KEY_ITEMS, Gson().toJson(clothingItems)).apply()
     }
 
     override fun onRequestPermissionsResult(
@@ -776,8 +780,8 @@ class WardrobeActivity : AppCompatActivity() {
     private fun loadClothingItems() {
         try {
             // 首先尝试从 SharedPreferences 加载数据
-            val prefs = getSharedPreferences("clothing_prefs", MODE_PRIVATE)
-            val savedItems = prefs.getString("clothing_items", null)
+            val prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE)
+            val savedItems = prefs.getString(Constants.KEY_ITEMS, null)
 
             if (savedItems != null) {
                 // 如果有保存的数据，使用保存的数据
@@ -785,12 +789,12 @@ class WardrobeActivity : AppCompatActivity() {
                 clothingItems = Gson().fromJson(savedItems, type)
             } else {
                 // 如果没有保存的数据，加载默认数据
-                val jsonString = assets.open("default_clothing.json").bufferedReader().use { it.readText() }
+                val jsonString = assets.open(Constants.DEFAULT_JSON).bufferedReader().use { it.readText() }
                 val type = object : TypeToken<List<RecommendActivity.ClothingItem>>() {}.type
                 clothingItems = Gson().fromJson<List<RecommendActivity.ClothingItem>>(jsonString, type).toMutableList()
 
                 // 保存默认数据到 SharedPreferences
-                prefs.edit().putString("clothing_items", Gson().toJson(clothingItems)).apply()
+                prefs.edit().putString(Constants.KEY_ITEMS, Gson().toJson(clothingItems)).apply()
             }
 
             adapter = WardrobeAdapter(clothingItems, this)

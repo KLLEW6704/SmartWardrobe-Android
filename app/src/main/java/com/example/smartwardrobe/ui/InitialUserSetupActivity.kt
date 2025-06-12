@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.smartwardrobe.R
 import com.example.smartwardrobe.data.UserInfo
@@ -25,16 +26,41 @@ class InitialUserSetupActivity : AppCompatActivity() {
         val rgComfort = findViewById<RadioGroup>(R.id.rgComfort)
         val btnSave = findViewById<Button>(R.id.btnSave)
 
+        // 设置默认选择
+        rgGender.check(R.id.rbMale)
+        rgComfort.check(R.id.rbNormal)
+
         btnSave.setOnClickListener {
-            val gender = findViewById<RadioButton>(
-                rgGender.checkedRadioButtonId
-            ).text.toString()
-            val comfort = findViewById<RadioButton>(
-                rgComfort.checkedRadioButtonId
-            ).text.toString()
-            prefs.saveUserInfo(UserInfo(gender, comfort))
-            startActivity(Intent(this, RecommendActivity::class.java))
-            finish()
+            try {
+                // 确保有选择
+                if (rgGender.checkedRadioButtonId == -1 || rgComfort.checkedRadioButtonId == -1) {
+                    Toast.makeText(this, "请选择性别和体感偏好", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                // 安全获取选中的值
+                val genderButton = findViewById<RadioButton>(rgGender.checkedRadioButtonId)
+                val comfortButton = findViewById<RadioButton>(rgComfort.checkedRadioButtonId)
+
+                if (genderButton == null || comfortButton == null) {
+                    Toast.makeText(this, "请重新选择", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val gender = genderButton.text.toString()
+                val comfort = comfortButton.text.toString()
+
+                // 保存用户信息
+                prefs.saveUserInfo(UserInfo(gender, comfort))
+
+                // 跳转到主界面
+                startActivity(Intent(this, RecommendActivity::class.java))
+                finish()
+            } catch (e: Exception) {
+                // 记录错误并显示友好的错误信息
+                e.printStackTrace()
+                Toast.makeText(this, "设置失败，请重试", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

@@ -99,12 +99,16 @@ class RecommendActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_recommend)
 
+        defaultClothingItems = emptyList()
+
         initViews()
         initServices()
         loadDefaultClothing()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         loadInitialClothing()
         requestLocationAndLoadWeather()
+
+        defaultClothingItems = emptyList() // 初始化为空列表
 
         btnSubmitToHuggingFace.setOnClickListener {
             val userInput = etHuggingFaceInput.text.toString().trim()
@@ -205,16 +209,6 @@ class RecommendActivity : AppCompatActivity() {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         zhipuApiService = zhipuRetrofit.create(ZhipuApiService::class.java)
-    }
-
-    private fun loadDefaultClothing() {
-        try {
-            val jsonString = assets.open(DEFAULT_JSON).bufferedReader().use { it.readText() }
-            defaultClothingItems = Gson().fromJson(jsonString, object : TypeToken<List<ClothingItem>>() {}.type)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            defaultClothingItems = emptyList()
-        }
     }
 
     private fun generateZhipuToken(apiKey: String): String? {
@@ -319,9 +313,13 @@ class RecommendActivity : AppCompatActivity() {
     private fun buildDefaultPrompt(userInput: String): String {
         val temperature = currentWeatherData?.main?.temp?.let { "${it}°C" } ?: "未知温度"
         val weatherDesc = currentWeatherData?.weather?.firstOrNull()?.main ?: "未知天气"
-
         val userInfo = UserPreferences(this).getUserInfo()
         val userGender = userInfo.gender
+
+        // 检查衣物列表
+        if (defaultClothingItems.isEmpty()) {
+            loadDefaultClothing() // 如果列表为空，尝试重新加载
+        }
 
         return """
         请为${userGender}性用户提供简短的穿搭建议：
@@ -332,23 +330,31 @@ class RecommendActivity : AppCompatActivity() {
         请简洁列出：
         1. 搭配方案（上衣、外套、下装、鞋子）
         2. 一句话说明原因
-    """.trimIndent()
+        """.trimIndent()
     }
 
     private fun buildWardrobePrompt(userInput: String): String {
         val temperature = currentWeatherData?.main?.temp?.let { "${it}°C" } ?: "未知温度"
         val weatherDesc = currentWeatherData?.weather?.firstOrNull()?.main ?: "未知天气"
-
         val userInfo = UserPreferences(this).getUserInfo()
         val userGender = userInfo.gender
 
+        // 重新加载衣物数据（如果为空）
+        if (defaultClothingItems.isEmpty()) {
+            loadDefaultClothing()
+        }
+
         // 按类别组织衣物
         val categorizedClothes = defaultClothingItems.groupBy { it.category }
-        val clothingDesc = categorizedClothes.entries.joinToString("\n\n") { (category, items) ->
-            val itemsList = items.joinToString("\n") {
-                "- ${it.name}（${it.style}风格，${it.thickness}厚度）"
+        val clothingDesc = if (categorizedClothes.isEmpty()) {
+            "衣柜暂时为空"
+        } else {
+            categorizedClothes.entries.joinToString("\n\n") { (category, items) ->
+                val itemsList = items.joinToString("\n") {
+                    "- ${it.name}（${it.style}风格，${it.thickness}厚度）"
+                }
+                "${category.uppercase()}类：\n$itemsList"
             }
-            "${category.uppercase()}类：\n$itemsList"
         }
 
         return """
@@ -362,16 +368,34 @@ class RecommendActivity : AppCompatActivity() {
         请简洁回答：
         1. 具体搭配方案（从以上衣物中选择）
         2. 一句话说明原因
-    """.trimIndent()
+        """.trimIndent()
     }
 
     private fun loadInitialClothing() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_ITEMS)) {
-            val defaultList = loadDefaultClothingFromAssets()
-            if (defaultList.isNotEmpty()) {
-                saveUserItemsToLocal(defaultList)
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!prefs.contains(KEY_ITEMS)) {
+                val defaultList = loadDefaultClothingFromAssets()
+                if (defaultList.isNotEmpty()) {
+                    saveUserItemsToLocal(defaultList)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("RecommendActivity", "Error loading initial clothing", e)
+            // 发生错误时不要崩溃，只是记录错误
+        }
+    }
+
+    private fun loadDefaultClothingFromAssets(): List<ClothingItem> {
+        return try {
+            assets.open(DEFAULT_JSON).bufferedReader(Charsets.UTF_8).use {
+                val jsonStr = it.readText()
+                val type = object : TypeToken<List<ClothingItem>>() {}.type
+                Gson().fromJson(jsonStr, type)
+            }
+        } catch (e: Exception) {
+            Log.e("RecommendActivity", "Error loading default clothing from assets", e)
+            emptyList()
         }
     }
 
@@ -552,16 +576,45 @@ class RecommendActivity : AppCompatActivity() {
         tvRecommendations.text = "请输入你的场景或需求，获取智能穿搭建议"
     }
 
-    private fun loadDefaultClothingFromAssets(): List<ClothingItem> {
-        return try {
-            assets.open(DEFAULT_JSON).bufferedReader(Charsets.UTF_8).use {
-                val jsonStr = it.readText()
-                val type = object : TypeToken<List<ClothingItem>>() {}.type
-                Gson().fromJson(jsonStr, type)
+    private fun loadDefaultClothing() {
+        try {
+            val prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE)
+            val savedItems = prefs.getString(Constants.KEY_ITEMS, null)
+
+            defaultClothingItems = if (!savedItems.isNullOrEmpty()) {
+                try {
+                    // 从 SharedPreferences 加载数据
+                    val type = object : TypeToken<List<ClothingItem>>() {}.type
+                    Gson().fromJson(savedItems, type) ?: emptyList()
+                } catch (e: Exception) {
+                    Log.e("RecommendActivity", "Error parsing saved items", e)
+                    emptyList()
+                }
+            } else {
+                try {
+                    // 从默认文件加载数据
+                    val jsonString = assets.open(Constants.DEFAULT_JSON).bufferedReader().use { it.readText() }
+                    val type = object : TypeToken<List<ClothingItem>>() {}.type
+                    val items: List<ClothingItem> = Gson().fromJson(jsonString, type) ?: emptyList()
+
+                    // 保存默认数据到 SharedPreferences
+                    if (items.isNotEmpty()) {
+                        prefs.edit().putString(Constants.KEY_ITEMS, Gson().toJson(items)).apply()
+                    }
+
+                    items
+                } catch (e: Exception) {
+                    Log.e("RecommendActivity", "Error loading default items", e)
+                    emptyList()
+                }
+            }
+
+            if (defaultClothingItems.isEmpty()) {
+                Log.w("RecommendActivity", "No clothing items loaded")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+            Log.e("RecommendActivity", "Error in loadDefaultClothing", e)
+            defaultClothingItems = emptyList()
         }
     }
 
