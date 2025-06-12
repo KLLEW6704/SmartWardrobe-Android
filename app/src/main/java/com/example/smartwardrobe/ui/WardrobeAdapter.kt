@@ -76,7 +76,7 @@ class WardrobeAdapter(
         spinnerCategory.adapter = categoryAdapter
         spinnerCategory.setSelection(categories.indexOf(item.category).coerceAtLeast(0))
 
-        AlertDialog.Builder(context)
+        val dialog = AlertDialog.Builder(context)
             .setTitle("编辑衣物")
             .setView(dialogView)
             .setPositiveButton("保存") { _, _ ->
@@ -96,7 +96,43 @@ class WardrobeAdapter(
                 Toast.makeText(context, "保存成功", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
+            .setNeutralButton("删除") { _, _ ->
+                // 显示删除确认对话框
+                showDeleteConfirmationDialog(position, item)
+            }
             .create()
+
+        dialog.show()
+    }
+
+    private fun showDeleteConfirmationDialog(position: Int, item: RecommendActivity.ClothingItem) {
+        AlertDialog.Builder(context)
+            .setTitle("删除衣物")
+            .setMessage("确定要删除这件衣物吗？\n${item.name}")
+            .setPositiveButton("确定") { _, _ ->
+                // 删除图片文件（如果存在）
+                if (!item.imageUri.isNullOrEmpty()) {
+                    try {
+                        val file = java.io.File(item.imageUri)
+                        if (file.exists()) {
+                            file.delete()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
+                // 从列表中移除
+                items.removeAt(position)
+                notifyItemRemoved(position)
+                notifyItemRangeChanged(position, items.size)
+
+                // 保存更新后的列表
+                saveItems()
+
+                Toast.makeText(context, "删除成功", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
 
