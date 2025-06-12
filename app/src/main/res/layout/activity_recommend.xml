@@ -1,155 +1,193 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        style="@android:style/Widget.Material.Light.ProgressBar.Large"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone" />
-
-    <Button
-        android:id="@+id/btnRetry"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="网络异常，点我重试"
-        android:textColor="@android:color/white"
-        android:visibility="gone" />
-
-    <ScrollView
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp">
+        android:layout_height="match_parent">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="@android:style/Widget.Material.Light.ProgressBar.Large"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp">
+            android:layout_gravity="center"
+            android:visibility="gone" />
 
-            <androidx.cardview.widget.CardView
-                android:id="@+id/weather_card"
+        <Button
+            android:id="@+id/btnRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="网络异常，点我重试"
+            android:textColor="@android:color/white"
+            android:visibility="gone" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="230dp"
-                android:layout_marginBottom="24dp"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="8dp"
-                android:layout_marginTop="40dp">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp">
 
-                <androidx.constraintlayout.widget.ConstraintLayout
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/weather_card"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="230dp"
+                    android:layout_marginBottom="24dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="8dp"
+                    android:layout_marginTop="40dp">
 
-                    <ImageView
-                        android:id="@+id/iv_weather_background"
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent">
+
+                        <ImageView
+                            android:id="@+id/iv_weather_background"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:scaleType="centerCrop"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            tools:src="@drawable/bg_sunny" />
+
+                        <TextView
+                            android:id="@+id/tv_location"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="24dp"
+                            android:layout_marginTop="24dp"
+                            android:shadowColor="#BF000000"
+                            android:shadowRadius="4"
+                            android:textColor="@android:color/white"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            tools:text="Kuala Lumpur" />
+
+                        <ImageView
+                            android:id="@+id/iv_weather_icon"
+                            android:layout_width="80dp"
+                            android:layout_height="80dp"
+                            android:layout_marginTop="8dp"
+                            app:layout_constraintStart_toStartOf="@+id/tv_location"
+                            app:layout_constraintTop_toBottomOf="@id/tv_location"
+                            app:tint="@android:color/white"
+                            tools:src="@drawable/ic_sunny" />
+
+                        <TextView
+                            android:id="@+id/tv_temperature"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:shadowColor="#BF000000"
+                            android:shadowRadius="6"
+                            android:textColor="@android:color/white"
+                            android:textSize="64sp"
+                            android:textStyle="bold"
+                            app:layout_constraintBottom_toBottomOf="@+id/iv_weather_icon"
+                            app:layout_constraintStart_toEndOf="@+id/iv_weather_icon"
+                            app:layout_constraintTop_toTopOf="@+id/iv_weather_icon"
+                            tools:text="29°C" />
+
+                        <TextView
+                            android:id="@+id/tv_weather_condition"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="24dp"
+                            android:layout_marginBottom="24dp"
+                            android:shadowColor="#BF000000"
+                            android:shadowRadius="4"
+                            android:textColor="@android:color/white"
+                            android:textSize="18sp"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            tools:text="Sunny" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </androidx.cardview.widget.CardView>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="想要什么风格的穿搭建议？"
+                    android:textSize="16sp" />
+
+                <EditText
+                    android:id="@+id/etHuggingFaceInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="@android:drawable/edit_text"
+                    android:hint="例如：一场轻松的周末野餐"
+                    android:inputType="text"
+                    android:padding="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Spinner
+                        android:id="@+id/wardrobeSpinner"
                         android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:scaleType="centerCrop"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        tools:src="@drawable/bg_sunny" /> <TextView
-                    android:id="@+id/tv_location"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="24dp"
-                    android:layout_marginTop="24dp"
-                    android:shadowColor="#BF000000"
-                    android:shadowRadius="4"
-                    android:textColor="@android:color/white"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    tools:text="Kuala Lumpur" />
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"/>
 
-                    <ImageView
-                        android:id="@+id/iv_weather_icon"
-                        android:layout_width="80dp"
-                        android:layout_height="80dp"
-                        android:layout_marginTop="8dp"
-                        app:layout_constraintStart_toStartOf="@+id/tv_location"
-                        app:layout_constraintTop_toBottomOf="@id/tv_location"
-                        app:tint="@android:color/white"
-                        tools:src="@drawable/ic_sunny" /> <TextView
-                    android:id="@+id/tv_temperature"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:shadowColor="#BF000000"
-                    android:shadowRadius="6"
-                    android:textColor="@android:color/white"
-                    android:textSize="64sp"
-                    android:textStyle="bold"
-                    app:layout_constraintBottom_toBottomOf="@+id/iv_weather_icon"
-                    app:layout_constraintStart_toEndOf="@+id/iv_weather_icon"
-                    app:layout_constraintTop_toTopOf="@+id/iv_weather_icon"
-                    tools:text="29°C" />
-
-                    <TextView
-                        android:id="@+id/tv_weather_condition"
+                    <Button
+                        android:id="@+id/btnSubmitToHuggingFace"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="24dp"
-                        android:layout_marginBottom="24dp"
-                        android:shadowColor="#BF000000"
-                        android:shadowRadius="4"
-                        android:textColor="@android:color/white"
-                        android:textSize="18sp"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintEnd_toEndOf="parent"
-                        tools:text="Sunny" />
+                        android:text="获取AI建议" />
+                </LinearLayout>
 
-                </androidx.constraintlayout.widget.ConstraintLayout>
-            </androidx.cardview.widget.CardView>
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="想要什么风格的穿搭建议？"
-                android:textSize="16sp" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="24dp"
+                    android:background="?android:attr/listDivider" />
 
-            <EditText
-                android:id="@+id/etHuggingFaceInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="12dp"
-                android:background="@android:drawable/edit_text"
-                android:hint="例如：一场轻松的周末野餐"
-                android:inputType="text"
-                android:padding="12dp" />
+                <TextView
+                    android:id="@+id/tvRecommendations"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="推荐建议将会显示在这里"
+                    android:textSize="16sp" />
 
-            <Button
-                android:id="@+id/btnSubmitToHuggingFace"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:text="获取AI建议" />
+            </LinearLayout>
+        </ScrollView>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="24dp"
-                android:background="?android:attr/listDivider" />
+    </FrameLayout>
 
-            <TextView
-                android:id="@+id/tvRecommendations"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="推荐建议将会显示在这里"
-                android:textSize="16sp" />
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabWardrobe"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="20dp"
+        android:contentDescription="打开衣柜"
+        app:srcCompat="@drawable/ic_wardrobe"
+        app:fabSize="normal"
+        app:backgroundTint="?attr/colorPrimary"
+        app:tint="@android:color/white"/>
 
-        </LinearLayout>
-    </ScrollView>
-
-</FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

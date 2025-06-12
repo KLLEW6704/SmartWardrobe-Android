@@ -1,3 +1,7 @@
 <resources>
+    <string-array name="wardrobe_types">
+        <item>我的衣柜</item>
+        <item>默认衣柜</item>
+    </string-array>
     <string name="app_name">SmartWardrobe</string>
 </resources>
