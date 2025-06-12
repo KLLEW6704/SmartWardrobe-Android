@@ -84,4 +84,6 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.auth0:java-jwt:4.4.0")
     implementation ("androidx.cardview:cardview:1.0.0")
+    implementation ("com.auth0.android:jwtdecode:2.0.0")
+    implementation ("com.squareup.okhttp3:okhttp:4.9.0")
 }

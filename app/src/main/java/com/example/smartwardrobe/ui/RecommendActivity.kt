@@ -1,7 +1,9 @@
 package com.example.smartwardrobe.ui
 
+import java.util.concurrent.TimeUnit
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -15,40 +17,48 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.example.smartwardrobe.BuildConfig
 import com.example.smartwardrobe.R
 import com.example.smartwardrobe.data.*
-import com.example.smartwardrobe.logic.OutfitRecommender
-import com.example.smartwardrobe.logic.ZhipuPromptHelper
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import okhttp3.OkHttpClient
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
-import retrofit2.http.Header
-import retrofit2.http.POST
+import retrofit2.http.*
 import java.util.Locale
 
-// Zhipu AI的数据类和接口定义
+// 智谱 AI 的数据类和接口定义
 data class ZhipuRequest(
     val model: String = "glm-4",
-    val messages: List<ZhipuMessage>
+    val messages: List<ZhipuMessage>,
+    val temperature: Double = 0.7,
+    val maxTokens: Int = 2048,
+    val topP: Double,
+    val stream: Boolean
 )
+
 data class ZhipuMessage(
     val role: String = "user",
     val content: String
 )
+
 data class ZhipuResponse(
     val choices: List<ZhipuChoice>,
     val usage: ZhipuUsage
 )
+
 data class ZhipuChoice(
     val message: ZhipuMessage
 )
+
 data class ZhipuUsage(
     val totalTokens: Int
 )
+
 interface ZhipuApiService {
     @POST("chat/completions")
+    @Headers("Content-Type: application/json")
     fun getCompletion(
         @Header("Authorization") token: String,
         @Body request: ZhipuRequest
@@ -75,7 +85,6 @@ class RecommendActivity : AppCompatActivity() {
     private lateinit var tvLocation: TextView
     private lateinit var tvTemperature: TextView
     private lateinit var tvWeatherCondition: TextView
-
     private lateinit var etHuggingFaceInput: EditText
     private lateinit var btnSubmitToHuggingFace: Button
     private lateinit var tvRecommendations: TextView
@@ -83,6 +92,8 @@ class RecommendActivity : AppCompatActivity() {
     private lateinit var btnRetry: Button
 
     private var currentWeatherData: WeatherResponse? = null
+    private var useDefaultMode = false
+    private lateinit var defaultClothingItems: List<ClothingItem>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,6 +101,7 @@ class RecommendActivity : AppCompatActivity() {
 
         initViews()
         initServices()
+        loadDefaultClothing()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         loadInitialClothing()
         requestLocationAndLoadWeather()
@@ -119,19 +131,90 @@ class RecommendActivity : AppCompatActivity() {
         tvRecommendations = findViewById(R.id.tvRecommendations)
         progressBar = findViewById(R.id.progressBar)
         btnRetry = findViewById(R.id.btnRetry)
+
+        val spinner = findViewById<Spinner>(R.id.wardrobeSpinner)
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.wardrobe_types,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinner.adapter = adapter
+        }
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+                useDefaultMode = pos == 1
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                useDefaultMode = false
+            }
+        }
+
+        val fabWardrobe = findViewById<FloatingActionButton>(R.id.fabWardrobe)
+        fabWardrobe.setOnClickListener {
+            val intent = Intent(this, WardrobeActivity::class.java)
+            startActivity(intent)
+        }
     }
 
     private fun initServices() {
+        // 天气服务
+        val weatherClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val request = original.newBuilder()
+                    .header("Accept", "application/json")
+                    .method(original.method, original.body)
+                    .build()
+                chain.proceed(request)
+            }
+            .connectTimeout(30, TimeUnit.SECONDS)  // 连接超时时间
+            .readTimeout(30, TimeUnit.SECONDS)     // 读取超时时间
+            .writeTimeout(30, TimeUnit.SECONDS)    // 写入超时时间
+            .build()
+
         weatherService = Retrofit.Builder()
             .baseUrl(weatherApiBaseUrl)
+            .client(weatherClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(WeatherService::class.java)
+
+        // 智谱 AI 服务
+        val zhipuClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val request = original.newBuilder()
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .method(original.method, original.body)
+                    .build()
+                chain.proceed(request)
+            }
+            .connectTimeout(60, TimeUnit.SECONDS)  // 增加连接超时时间
+            .readTimeout(60, TimeUnit.SECONDS)     // 增加读取超时时间
+            .writeTimeout(60, TimeUnit.SECONDS)    // 增加写入超时时间
+            .retryOnConnectionFailure(true)        // 启用重试机制
+            .build()
+
         val zhipuRetrofit = Retrofit.Builder()
             .baseUrl("https://open.bigmodel.cn/api/paas/v4/")
+            .client(zhipuClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         zhipuApiService = zhipuRetrofit.create(ZhipuApiService::class.java)
+    }
+
+    private fun loadDefaultClothing() {
+        try {
+            val jsonString = assets.open(DEFAULT_JSON).bufferedReader().use { it.readText() }
+            defaultClothingItems = Gson().fromJson(jsonString, object : TypeToken<List<ClothingItem>>() {}.type)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            defaultClothingItems = emptyList()
+        }
     }
 
     private fun generateZhipuToken(apiKey: String): String? {
@@ -141,9 +224,14 @@ class RecommendActivity : AppCompatActivity() {
             val id = parts[0]
             val secret = parts[1]
             if (id.isEmpty() || secret.isEmpty()) return null
+
             val algorithm = Algorithm.HMAC256(secret)
             val now = System.currentTimeMillis()
-            val headerClaims = mapOf("alg" to "HS256", "sign_type" to "SIGN")
+            val headerClaims = mapOf(
+                "alg" to "HS256",
+                "sign_type" to "SIGN"
+            )
+
             return JWT.create()
                 .withHeader(headerClaims)
                 .withClaim("api_key", id)
@@ -162,43 +250,45 @@ class RecommendActivity : AppCompatActivity() {
             Toast.makeText(this, "API Key未在local.properties中配置", Toast.LENGTH_LONG).show()
             return
         }
+
+        Log.d("ZhipuAPI", "Starting API request...")
+
         val token = generateZhipuToken(apiKey)
         if (token == null) {
             Toast.makeText(this, "API Key格式错误，无法生成Token", Toast.LENGTH_LONG).show()
             return
         }
+
+        Log.d("ZhipuAPI", "Generated token: ${token.take(20)}...")
+
         if (currentWeatherData == null) {
             Toast.makeText(this, "正在等待天气信息...", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // 获取用户衣柜和用户信息
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val itemsJson = prefs.getString(KEY_ITEMS, null)
-        val userItems: List<ClothingItem> = if (itemsJson.isNullOrEmpty()) emptyList() else {
-            val type = object : TypeToken<List<ClothingItem>>() {}.type
-            Gson().fromJson(itemsJson, type)
-        }
-        val wardrobeJson = Gson().toJson(userItems)
-        val userInfo = UserPreferences(this).getUserInfo()
-        val occasion = userInput
+        progressBar.visibility = View.VISIBLE
+        btnRetry.visibility = View.GONE
+        tvRecommendations.text = "AI正在根据你的需求进行搭配..."
 
-        // 拼接优化后的prompt
-        val prompt = ZhipuPromptHelper.buildZhipuOutfitPrompt(
-            gender = userInfo.gender,
-            bodyType = userInfo.comfort,
-            city = currentWeatherData!!.name,
-            weatherDesc = currentWeatherData!!.weather.firstOrNull()?.main ?: "未知",
-            temperature = currentWeatherData!!.main.temp.toString(),
-            occasion = occasion,
-            wardrobeJson = wardrobeJson
+        val promptText = if (useDefaultMode) {
+            // 默认衣柜模式：直接让 AI 根据场景和天气提供建议
+            buildDefaultPrompt(userInput)
+        } else {
+            // 我的衣柜模式：使用 json 数据库中的衣物数据
+            buildWardrobePrompt(userInput)
+        }
+
+        Log.d("ZhipuAPI", "Final prompt: ${promptText.take(200)}...")
+
+        val request = ZhipuRequest(
+            model = "glm-4",
+            messages = listOf(ZhipuMessage(role = "user", content = promptText)),
+            temperature = 0.7,
+            maxTokens = 2048,
+            topP = 0.1,
+            stream = false
         )
 
-        progressBar.visibility = View.VISIBLE
-        tvRecommendations.text = "AI正在根据你的衣橱和天气进行搭配..."
-
-        val messages = listOf(ZhipuMessage(content = prompt))
-        val request = ZhipuRequest(messages = messages)
         val call = zhipuApiService.getCompletion("Bearer $token", request)
 
         call.enqueue(object : Callback<ZhipuResponse> {
@@ -207,19 +297,72 @@ class RecommendActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     val result = response.body()?.choices?.firstOrNull()?.message?.content
                     tvRecommendations.text = result ?: "AI没有返回有效的建议。"
+                    Log.d("ZhipuAPI", "Successful response: ${result?.take(100)}...")
                     Toast.makeText(this@RecommendActivity, "智能衣橱建议获取成功！", Toast.LENGTH_SHORT).show()
                 } else {
                     val errorBody = response.errorBody()?.string()
                     tvRecommendations.text = "请求失败，错误码：${response.code()}\n${errorBody}"
-                    Log.e("ZhipuAPI", "Error: ${response.code()} - $errorBody")
+                    Log.e("ZhipuAPI", "Error response: ${response.code()} - $errorBody")
                 }
             }
+
             override fun onFailure(call: Call<ZhipuResponse>, t: Throwable) {
                 progressBar.visibility = View.GONE
-                tvRecommendations.text = "网络请求失败，请检查网络连接。\n错误: ${t.message}"
-                Log.e("ZhipuAPI", "Failure: ${t.message}", t)
+                val errorMessage = "网络请求失败：${t.message}"
+                tvRecommendations.text = errorMessage
+                Log.e("ZhipuAPI", "Network failure", t)
+                Toast.makeText(this@RecommendActivity, errorMessage, Toast.LENGTH_LONG).show()
             }
         })
+    }
+
+    private fun buildDefaultPrompt(userInput: String): String {
+        val temperature = currentWeatherData?.main?.temp?.let { "${it}°C" } ?: "未知温度"
+        val weatherDesc = currentWeatherData?.weather?.firstOrNull()?.main ?: "未知天气"
+
+        val userInfo = UserPreferences(this).getUserInfo()
+        val userGender = userInfo.gender
+
+        return """
+        请为${userGender}性用户提供简短的穿搭建议：
+
+        场景：$userInput
+        天气：$temperature, $weatherDesc
+        
+        请简洁列出：
+        1. 搭配方案（上衣、外套、下装、鞋子）
+        2. 一句话说明原因
+    """.trimIndent()
+    }
+
+    private fun buildWardrobePrompt(userInput: String): String {
+        val temperature = currentWeatherData?.main?.temp?.let { "${it}°C" } ?: "未知温度"
+        val weatherDesc = currentWeatherData?.weather?.firstOrNull()?.main ?: "未知天气"
+
+        val userInfo = UserPreferences(this).getUserInfo()
+        val userGender = userInfo.gender
+
+        // 按类别组织衣物
+        val categorizedClothes = defaultClothingItems.groupBy { it.category }
+        val clothingDesc = categorizedClothes.entries.joinToString("\n\n") { (category, items) ->
+            val itemsList = items.joinToString("\n") {
+                "- ${it.name}（${it.style}风格，${it.thickness}厚度）"
+            }
+            "${category.uppercase()}类：\n$itemsList"
+        }
+
+        return """
+        为${userGender}性用户从以下衣柜中选择搭配：
+
+        $clothingDesc
+        
+        场景：$userInput
+        天气：$temperature, $weatherDesc
+        
+        请简洁回答：
+        1. 具体搭配方案（从以上衣物中选择）
+        2. 一句话说明原因
+    """.trimIndent()
     }
 
     private fun loadInitialClothing() {
@@ -231,14 +374,28 @@ class RecommendActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun requestLocationAndLoadWeather() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION)
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                REQUEST_LOCATION_PERMISSION
+            )
         } else {
             fetchLocationAndLoadWeather()
         }
     }
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_LOCATION_PERMISSION) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -249,11 +406,19 @@ class RecommendActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun fetchLocationAndLoadWeather() {
         progressBar.visibility = View.VISIBLE
         btnRetry.visibility = View.GONE
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) { return }
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
         fusedLocationClient.lastLocation
             .addOnSuccessListener { location ->
                 if (location != null) {
@@ -268,45 +433,71 @@ class RecommendActivity : AppCompatActivity() {
                 fetchWeatherByCity("北京")
             }
     }
+
     private fun fetchWeatherByCoordinates(lat: Double, lon: Double) {
         val apiKey = BuildConfig.WEATHER_API_KEY
         val call = weatherService.getCurrentWeatherByCoordinates(lat, lon, apiKey)
         call.enqueue(object : Callback<WeatherResponse> {
-            override fun onResponse(call: Call<WeatherResponse>, response: Response<WeatherResponse>) {
+            override fun onResponse(
+                call: Call<WeatherResponse>,
+                response: Response<WeatherResponse>
+            ) {
                 progressBar.visibility = View.GONE
                 if (response.isSuccessful) {
                     currentWeatherData = response.body()
                     displayRecommendations(currentWeatherData)
                 } else {
                     btnRetry.visibility = View.VISIBLE
-                    Toast.makeText(this@RecommendActivity, "获取天气信息失败: ${response.message()}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@RecommendActivity,
+                        "获取天气信息失败: ${response.message()}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
+
             override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
                 progressBar.visibility = View.GONE
                 btnRetry.visibility = View.VISIBLE
-                Toast.makeText(this@RecommendActivity, "获取天气失败：${t.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this@RecommendActivity,
+                    "获取天气失败：${t.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         })
     }
+
     private fun fetchWeatherByCity(cityName: String) {
         val apiKey = BuildConfig.WEATHER_API_KEY
         val call = weatherService.getCurrentWeatherByCity(cityName, apiKey)
         call.enqueue(object : Callback<WeatherResponse> {
-            override fun onResponse(call: Call<WeatherResponse>, response: Response<WeatherResponse>) {
+            override fun onResponse(
+                call: Call<WeatherResponse>,
+                response: Response<WeatherResponse>
+            ) {
                 progressBar.visibility = View.GONE
                 if (response.isSuccessful) {
                     currentWeatherData = response.body()
                     displayRecommendations(currentWeatherData)
                 } else {
                     btnRetry.visibility = View.VISIBLE
-                    Toast.makeText(this@RecommendActivity, "获取天气信息失败: ${response.message()}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@RecommendActivity,
+                        "获取天气信息失败: ${response.message()}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
+
             override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
                 progressBar.visibility = View.GONE
                 btnRetry.visibility = View.VISIBLE
-                Toast.makeText(this@RecommendActivity, "获取天气失败：${t.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    this@RecommendActivity,
+                    "获取天气失败：${t.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         })
     }
@@ -350,23 +541,17 @@ class RecommendActivity : AppCompatActivity() {
         }
     }
 
-
-    // --- [修改] displayRecommendations 现在只负责显示推荐，天气UI更新交给新方法 ---
     private fun displayRecommendations(weather: WeatherResponse?) {
-        // 步骤1：更新天气UI（无论是否成功）
         updateWeatherUI(weather)
 
-        // 步骤2：如果天气数据获取失败，则提示用户
         if (weather == null) {
             tvRecommendations.text = "无法获取天气，暂时不能提供穿搭建议。"
             return
         }
 
-        // 步骤3：显示提示信息，引导用户使用AI推荐
         tvRecommendations.text = "请输入你的场景或需求，获取智能穿搭建议"
     }
 
-    // loadDefaultClothingFromAssets() 和 saveUserItemsToLocal() 保持不变...
     private fun loadDefaultClothingFromAssets(): List<ClothingItem> {
         return try {
             assets.open(DEFAULT_JSON).bufferedReader(Charsets.UTF_8).use {
@@ -379,8 +564,17 @@ class RecommendActivity : AppCompatActivity() {
             emptyList()
         }
     }
+
     private fun saveUserItemsToLocal(items: List<ClothingItem>) {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_ITEMS, Gson().toJson(items)).apply()
     }
+
+    data class ClothingItem(
+        val name: String,
+        val style: String,
+        val thickness: String,
+        val category: String,
+        val imageUri: String
+    )
 }
