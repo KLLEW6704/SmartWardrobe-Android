@@ -5,12 +5,13 @@ import android.util.Log
 import com.example.smartwardrobe.ui.RecommendActivity
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import androidx.core.content.edit
 
 object ClothingManager {
     fun saveItems(context: Context, items: List<RecommendActivity.ClothingItem>) {
         try {
             val prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putString(Constants.KEY_ITEMS, Gson().toJson(items)).apply()
+            prefs.edit { putString(Constants.KEY_ITEMS, Gson().toJson(items)) }
         } catch (e: Exception) {
             Log.e("ClothingManager", "Error saving items", e)
         }

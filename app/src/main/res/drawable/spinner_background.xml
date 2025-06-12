@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#1F000000">
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#FFFFFF"/>
+                    <stroke android:color="#E0E0E0" android:width="1dp"/>
+                    <corners android:radius="8dp"/>
+                </shape>
+            </item>
+            <item android:gravity="end|center_vertical" android:right="12dp">
+                <vector
+                    android:width="24dp"
+                    android:height="24dp"
+                    android:viewportWidth="24"
+                    android:viewportHeight="24"
+                    android:tint="#757575">
+                    <path
+                        android:fillColor="#757575"
+                        android:pathData="M7,10l5,5 5,-5z"/>
+                </vector>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

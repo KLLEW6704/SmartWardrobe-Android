@@ -1,4 +1,7 @@
 <resources>
+    <color name="logo_primary">#03A9F4</color>
+    <color name="logo_light">#E1F5FE</color>
+    <color name="logo_white">#FFFFFF</color>
     <color name="purple_200">#BB86FC</color>
     <color name="purple_500">#6200EE</color>
     <color name="purple_700">#3700B3</color>
