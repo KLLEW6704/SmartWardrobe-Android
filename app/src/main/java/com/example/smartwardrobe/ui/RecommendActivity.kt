@@ -28,42 +28,13 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import java.util.Locale
 
-// 智谱 AI 的数据类和接口定义
-data class ZhipuRequest(
-    val model: String = "glm-4",
-    val messages: List<ZhipuMessage>,
-    val temperature: Double = 0.7,
-    val maxTokens: Int = 2048,
-    val topP: Double,
-    val stream: Boolean
-)
 
 data class ZhipuMessage(
     val role: String = "user",
     val content: String
 )
 
-data class ZhipuResponse(
-    val choices: List<ZhipuChoice>,
-    val usage: ZhipuUsage
-)
 
-data class ZhipuChoice(
-    val message: ZhipuMessage
-)
-
-data class ZhipuUsage(
-    val totalTokens: Int
-)
-
-interface ZhipuApiService {
-    @POST("chat/completions")
-    @Headers("Content-Type: application/json")
-    fun getCompletion(
-        @Header("Authorization") token: String,
-        @Body request: ZhipuRequest
-    ): Call<ZhipuResponse>
-}
 
 class RecommendActivity : AppCompatActivity() {
 
@@ -285,8 +256,6 @@ class RecommendActivity : AppCompatActivity() {
             messages = listOf(ZhipuMessage(role = "user", content = promptText)),
             temperature = 0.7,
             maxTokens = 2048,
-            topP = 0.1,
-            stream = false
         )
 
         val call = zhipuApiService.getCompletion("Bearer $token", request)
