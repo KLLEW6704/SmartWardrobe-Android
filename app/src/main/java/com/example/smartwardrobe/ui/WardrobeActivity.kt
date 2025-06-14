@@ -289,8 +289,12 @@ class WardrobeActivity : AppCompatActivity(), OnItemInteractionListener {
                         category = spinnerCategory.selectedItem.toString(),
                         imageUri = imagePath
                     )
-                    clothingItems.add(newItem)
-                    adapter.notifyItemInserted(clothingItems.size - 1)
+                    // 修改这里：使用 add(0, newItem) 替代 add(newItem)
+                    clothingItems.add(0, newItem)
+                    // 通知适配器在开头插入了新项目
+                    adapter.notifyItemInserted(0)
+                    // 滚动到顶部显示新添加的衣物
+                    recyclerView.scrollToPosition(0)
                     saveItems()
                     Toast.makeText(this, "已添加新衣物", Toast.LENGTH_SHORT).show()
                 }
@@ -312,6 +316,7 @@ class WardrobeActivity : AppCompatActivity(), OnItemInteractionListener {
 
         etName.setText(item.name)
 
+        // 设置样式选择器
         val styles = arrayOf("休闲", "正式", "运动", "时尚")
         ArrayAdapter(this, android.R.layout.simple_spinner_item, styles).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -324,21 +329,21 @@ class WardrobeActivity : AppCompatActivity(), OnItemInteractionListener {
         ArrayAdapter(this, android.R.layout.simple_spinner_item, thicknesses).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerThickness.adapter = it
-            spinnerThickness.setSelection(styles.indexOf(item.thickness).coerceAtLeast(0))
+            spinnerThickness.setSelection(thicknesses.indexOf(item.thickness).coerceAtLeast(0))
         }
 
-
         // 设置类别选择器
-        val categories = arrayOf("上衣", "裤子", "外套", "裙子", "鞋子") 
+        val categories = arrayOf("上衣", "裤子", "外套", "裙子", "鞋子")
         ArrayAdapter(this, android.R.layout.simple_spinner_item, categories).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerCategory.adapter = it
             spinnerCategory.setSelection(categories.indexOf(item.category).coerceAtLeast(0))
         }
-        AlertDialog.Builder(this)
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("编辑衣物")
             .setView(dialogView)
-            .setPositiveButton("保存") { _, _ ->
+            .setPositiveButton(R.string.save) { dialog, _ ->
                 val updatedItem = item.copy(
                     name = etName.text.toString(),
                     style = spinnerStyle.selectedItem.toString(),
@@ -350,34 +355,94 @@ class WardrobeActivity : AppCompatActivity(), OnItemInteractionListener {
                 saveItems()
                 Toast.makeText(this, "修改成功", Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("取消", null)
-            .show()
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.delete) { dialog, _ ->
+                // 显示删除确认对话框
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.delete_clothing)
+                    .setMessage(getString(R.string.confirm_delete_clothing, item.name))
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        // 从列表中移除
+                        clothingItems.removeAt(position)
+                        adapter.notifyItemRemoved(position)
+                        // 删除关联的图片文件
+                        try {
+                            File(item.imageUri).delete()
+                        } catch (e: Exception) {
+                            Log.e("FileDelete", "删除图片失败", e)
+                        }
+                        // 保存更改
+                        saveItems()
+                        Toast.makeText(this@WardrobeActivity,
+                            getString(R.string.delete_success),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .create()
+                    .show()
+            }
+            .create()
+
+        dialog.show()
     }
 
 
     // --- 文件和数据持久化方法 ---
 
     private fun loadClothingItems() {
-        val prefs = getSharedPreferences("clothing_prefs", Context.MODE_PRIVATE)
-        val jsonString = prefs.getString("clothing_items", null)
-        val type = object : TypeToken<MutableList<WardrobeItem>>() {}.type
-        clothingItems = if (jsonString != null) {
-            Gson().fromJson(jsonString, type)
-        } else {
-            // 如果没有保存的数据，可以加载默认数据
-            loadDefaultItems()
+        try {
+            val prefs = getSharedPreferences("clothing_prefs", Context.MODE_PRIVATE)
+            val jsonString = prefs.getString("clothing_items", null)
+
+            clothingItems = mutableListOf()
+
+            if (jsonString != null) {
+                try {
+                    val type = object : TypeToken<MutableList<WardrobeItem>>() {}.type
+                    val loadedItems: MutableList<WardrobeItem>? = Gson().fromJson(jsonString, type)
+                    if (loadedItems != null) {
+                        // 反转列表顺序，使最新添加的在前面
+                        clothingItems.addAll(loadedItems.reversed())
+                    }
+                } catch (e: Exception) {
+                    Log.e("WardrobeActivity", "Error parsing saved items", e)
+                }
+            } else {
+                val defaultItems = loadDefaultItems()
+                // 同样反转默认列表
+                clothingItems.addAll(defaultItems.reversed())
+            }
+
+            adapter = WardrobeAdapter(clothingItems, this)
+            recyclerView.adapter = adapter
+
+            if (jsonString == null) {
+                saveItems()
+            }
+
+        } catch (e: Exception) {
+            Log.e("WardrobeActivity", "Error in loadClothingItems", e)
+            clothingItems = mutableListOf()
+            adapter = WardrobeAdapter(clothingItems, this)
+            recyclerView.adapter = adapter
+            Toast.makeText(this, "加载衣物列表失败", Toast.LENGTH_SHORT).show()
         }
-        adapter = WardrobeAdapter(clothingItems, this) // 正确创建Adapter
-        recyclerView.adapter = adapter
     }
 
     private fun loadDefaultItems(): MutableList<WardrobeItem> {
         return try {
             val jsonString = assets.open("default_clothing.json").bufferedReader().use { it.readText() }
-            val type = object : TypeToken<MutableList<WardrobeItem>>() {}.type
-            Gson().fromJson(jsonString, type)
-        } catch (e: IOException) {
-            mutableListOf() // 文件不存在或读取失败，返回空列表
+            try {
+                val type = object : TypeToken<MutableList<WardrobeItem>>() {}.type
+                Gson().fromJson<MutableList<WardrobeItem>>(jsonString, type) ?: mutableListOf()
+            } catch (e: Exception) {
+                Log.e("WardrobeActivity", "Error parsing default items", e)
+                mutableListOf()
+            }
+        } catch (e: Exception) {
+            Log.e("WardrobeActivity", "Error loading default items", e)
+            mutableListOf()
         }
     }
 

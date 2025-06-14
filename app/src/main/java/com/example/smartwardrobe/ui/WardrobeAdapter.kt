@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.smartwardrobe.R
 
 class WardrobeAdapter(
-    private var items: MutableList<WardrobeItem>,
+    private var items: MutableList<WardrobeItem> = mutableListOf(),
     private val listener: OnItemInteractionListener
 ) : RecyclerView.Adapter<WardrobeAdapter.ViewHolder>() {
 

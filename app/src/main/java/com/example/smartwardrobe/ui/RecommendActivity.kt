@@ -64,7 +64,7 @@ class RecommendActivity : AppCompatActivity() {
 
     private var currentWeatherData: WeatherResponse? = null
     private var useDefaultMode = false
-    private lateinit var defaultClothingItems: List<ClothingItem>
+    private var defaultClothingItems: List<ClothingItem> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -181,10 +181,22 @@ class RecommendActivity : AppCompatActivity() {
     private fun loadDefaultClothing() {
         try {
             val jsonString = assets.open(DEFAULT_JSON).bufferedReader().use { it.readText() }
-            defaultClothingItems = Gson().fromJson(jsonString, object : TypeToken<List<ClothingItem>>() {}.type)
+            val type = object : TypeToken<List<ClothingItem>>() {}.type
+            val items: List<ClothingItem> = Gson().fromJson(jsonString, type) ?: emptyList()
+            defaultClothingItems = if (items.isEmpty()) {
+                Log.w("RecommendActivity", "No items found in $DEFAULT_JSON")
+                emptyList()
+            } else {
+                items
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("RecommendActivity", "Error loading default clothing", e)
             defaultClothingItems = emptyList()
+            Toast.makeText(
+                this,
+                "无法加载默认衣物数据，将使用空列表",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -241,11 +253,11 @@ class RecommendActivity : AppCompatActivity() {
         btnRetry.visibility = View.GONE
         tvRecommendations.text = "AI正在根据你的需求进行搭配..."
 
-        val promptText = if (useDefaultMode) {
-            // 默认衣柜模式：直接让 AI 根据场景和天气提供建议
+        val promptText = if (useDefaultMode || defaultClothingItems.isEmpty()) {
+            // 如果是默认模式或者衣柜为空，使用默认提示
             buildDefaultPrompt(userInput)
         } else {
-            // 我的衣柜模式：使用 json 数据库中的衣物数据
+            // 使用我的衣柜模式
             buildWardrobePrompt(userInput)
         }
 
@@ -311,6 +323,20 @@ class RecommendActivity : AppCompatActivity() {
         val userInfo = UserPreferences(this).getUserInfo()
         val userGender = userInfo.gender
 
+        // 检查衣物列表是否为空
+        if (defaultClothingItems.isEmpty()) {
+            return """
+        为${userGender}性用户提供建议：
+        
+        注意：当前衣柜中没有可用的衣物数据。
+        
+        场景：$userInput
+        天气：$temperature, $weatherDesc
+        
+        请提供通用的穿搭建议。
+        """.trimIndent()
+        }
+
         // 按类别组织衣物
         val categorizedClothes = defaultClothingItems.groupBy { it.category }
         val clothingDesc = categorizedClothes.entries.joinToString("\n\n") { (category, items) ->
@@ -321,28 +347,57 @@ class RecommendActivity : AppCompatActivity() {
         }
 
         return """
-        为${userGender}性用户从以下衣柜中选择搭配：
+    为${userGender}性用户从以下衣柜中选择搭配：
 
-        $clothingDesc
-        
-        场景：$userInput
-        天气：$temperature, $weatherDesc
-        
-        请简洁回答：
-        1. 具体搭配方案（从以上衣物中选择）
-        2. 一句话说明原因
+    $clothingDesc
+    
+    场景：$userInput
+    天气：$temperature, $weatherDesc
+    
+    请简洁回答：
+    1. 具体搭配方案（从以上衣物中选择）
+    2. 一句话说明原因
     """.trimIndent()
     }
 
     private fun loadInitialClothing() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_ITEMS)) {
-            val defaultList = loadDefaultClothingFromAssets()
-            if (defaultList.isNotEmpty()) {
-                saveUserItemsToLocal(defaultList)
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val savedItems = if (prefs.contains(KEY_ITEMS)) {
+                val jsonString = prefs.getString(KEY_ITEMS, null)
+                try {
+                    if (jsonString != null) {
+                        Gson().fromJson<List<ClothingItem>>(
+                            jsonString,
+                            object : TypeToken<List<ClothingItem>>() {}.type
+                        ) ?: emptyList()
+                    } else {
+                        emptyList()
+                    }
+                } catch (e: Exception) {
+                    Log.e("RecommendActivity", "Error parsing saved items", e)
+                    emptyList()
+                }
+            } else {
+                val defaultList = loadDefaultClothingFromAssets()
+                if (defaultList.isNotEmpty()) {
+                    saveUserItemsToLocal(defaultList)
+                }
+                defaultList
             }
+
+            Log.d("RecommendActivity", "Loaded ${savedItems.size} items")
+
+            // 更新默认衣物列表
+            defaultClothingItems = savedItems
+
+        } catch (e: Exception) {
+            Log.e("RecommendActivity", "Error in loadInitialClothing", e)
+            // 确保即使出错也初始化为空列表
+            defaultClothingItems = emptyList()
         }
     }
+
 
     private fun requestLocationAndLoadWeather() {
         if (ContextCompat.checkSelfPermission(
@@ -523,20 +578,30 @@ class RecommendActivity : AppCompatActivity() {
 
     private fun loadDefaultClothingFromAssets(): List<ClothingItem> {
         return try {
-            assets.open(DEFAULT_JSON).bufferedReader(Charsets.UTF_8).use {
-                val jsonStr = it.readText()
-                val type = object : TypeToken<List<ClothingItem>>() {}.type
-                Gson().fromJson(jsonStr, type)
+            val jsonString = assets.open(DEFAULT_JSON).bufferedReader(Charsets.UTF_8).use { it.readText() }
+            try {
+                Gson().fromJson<List<ClothingItem>>(
+                    jsonString,
+                    object : TypeToken<List<ClothingItem>>() {}.type
+                ) ?: emptyList()
+            } catch (e: Exception) {
+                Log.e("RecommendActivity", "Error parsing default JSON", e)
+                emptyList()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("RecommendActivity", "Error loading default clothing from assets", e)
             emptyList()
         }
     }
 
     private fun saveUserItemsToLocal(items: List<ClothingItem>) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_ITEMS, Gson().toJson(items)).apply()
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val jsonString = Gson().toJson(items)
+            prefs.edit().putString(KEY_ITEMS, jsonString).apply()
+        } catch (e: Exception) {
+            Log.e("RecommendActivity", "Error saving user items", e)
+        }
     }
 
     data class ClothingItem(

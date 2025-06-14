@@ -1,4 +1,10 @@
 <resources>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="delete_clothing">删除衣物</string>
+    <string name="confirm_delete_clothing">确定要删除 "%1$s" 吗？</string>
+    <string name="delete_success">已删除</string>
     <string-array name="wardrobe_types">
         <item>我的衣柜</item>
         <item>默认衣柜</item>

@@ -16,11 +16,11 @@ data class ZhipuRequest(
 )
 
 data class WardrobeItem(
-    val name: String,
-    val style: String,
-    val thickness: String,
-    val category: String,
-    val imageUri: String
+    val name: String = "",
+    val style: String = "",
+    val thickness: String = "",
+    val category: String = "",
+    val imageUri: String = ""
 )
 
 interface OnItemInteractionListener {

@@ -27,7 +27,6 @@
         </activity>
 
         <activity android:name=".ui.RecommendActivity" />
-        <activity android:name=".ui.AddClothingActivity" />
         <activity
             android:name=".ui.WardrobeActivity"
             android:label="我的衣柜"
